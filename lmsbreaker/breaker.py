@@ -258,7 +258,7 @@ class Breaker( ):
             raise LMS_LoginError("Неверный логин / пароль")
 
     def logout(self): #использовать во внешних модулях
-        browser.get("http://www.cambridgelms.org/touchstone/p/caslogout")
+        browser.get(HOST+"/touchstone/p/caslogout")
 
     def get_units(self): #использовать во внешних модулях
         self.response = browser.get(HOST+"/touchstone/p/frontpage")
