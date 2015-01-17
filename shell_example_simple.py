@@ -14,7 +14,9 @@ breaker = Breaker()
 try:
     breaker.login(username, password)
     breaker.attempt(unit_num, percent_min, percent_max)
-    print("Юнит %s успешно выполнен." % str(unit_num))
+    print("Юнит успешно выполнен.")
+except:
+    print("Произошла ошибка! Юнит не был решен. Попробуйте еще раз.")
 finally:
-    #иначе оставим открытую сессию
+     #всегда закрываем сессию
      breaker.logout()
