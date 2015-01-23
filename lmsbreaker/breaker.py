@@ -46,10 +46,9 @@ class _Response( ):
             response = browser.get(url)
             self.raw_html = response.text
             self.soup = response.soup if hasattr(response, "soup") else BeautifulSoup(response.text)
-        else:
-            if raw_html:
-                self.raw_html = raw_html
-                self.soup = BeautifulSoup(raw_html)
+        if raw_html:
+            self.raw_html = raw_html
+            self.soup = BeautifulSoup(raw_html)
 
     def is_logged_in(self): #при неудачной попытке входа получаем ту-же форму, при удачной -- редирект
         return not self.soup.find(id="username")
