@@ -18,6 +18,6 @@ LMS-Breaker написан на Python 3 и использует следующ�
 - BeautifulSoup
 
 ### Версия
-1.0.0
+1.0.1
 
 [cambridgelms.org]:http://cambridgelms.org
