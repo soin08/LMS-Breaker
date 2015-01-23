@@ -41,5 +41,5 @@ Thumbs.db
 *.ui
 login_window_ui.py
 setup.py
-start.py
+main.py
 unit_selection_ui.py
