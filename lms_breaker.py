@@ -38,7 +38,7 @@ try:
 
     print("Пляшем с бубном...")
 
-    breaker.attempt(unit_num, percent_min, percent_max)
+    breaker.attempt(units, unit_num, percent_min, percent_max)
 
     print("Шаман успешно решил адание "+str(unit_num))
     print("\"Каждое животное знает гораздо больше, чем ты\"")

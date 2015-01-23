@@ -1,8 +1,9 @@
+import sys
 from lmsbreaker import Breaker
 
 #данные пользователя
-username = "vasya"
-password = "12345"
+username = "username"
+password = "password"
  #номер юнита, который хотим решить (номер задания со страницы результатов, самый верхний - первый)
 unit_num = 1
 #минимальный и максимальный процент выполнения каждого задания
@@ -13,10 +14,12 @@ breaker = Breaker()
 
 try:
     breaker.login(username, password)
-    breaker.attempt(unit_num, percent_min, percent_max)
+    units = breaker.get_units()
+    breaker.attempt(units, unit_num, percent_min, percent_max)
     print("Юнит успешно выполнен.")
 except:
     print("Произошла ошибка! Юнит не был решен. Попробуйте еще раз.")
+    print(sys.exc_info())
 finally:
      #всегда закрываем сессию
      breaker.logout()
