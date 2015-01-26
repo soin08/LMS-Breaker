@@ -55,7 +55,7 @@ except LMS_SessionError:
     print("С бледнолицыми дела всегда идут туго.")
 
 except LMS_UnitError:
-    print("Введен неверный номер юнита!")
+    print("Введен неверный номер задания!")
     print("Шамана племени Нес Пирс не удастcя одурачить!")
 
 except LMS_UnknownError:

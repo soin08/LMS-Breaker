@@ -2,6 +2,7 @@ import re
 import datetime
 import random
 import urllib
+import requests
 import mechanicalsoup
 from bs4 import BeautifulSoup
 from bs4 import Tag
@@ -25,8 +26,20 @@ class LMS_UnitError(LMS_BaseError):
 class LMS_PercentError(LMS_BaseError):
     pass
 
-browser = mechanicalsoup.Browser()
-HOST = "http://www.cambridgelms.org"
+class _Browser(mechanicalsoup.Browser):
+    def __init__(self,  *args, **kwargs):
+        super(_Browser, self).__init__( *args, **kwargs)
+        self.cacert_path = requests.certs.where( )
+
+    def set_cacert_path(self, path):
+        self.cacert_path = path
+
+    def get(self, *args, **kwargs):
+        return super(_Browser, self).get(*args, verify = self.cacert_path, **kwargs)
+
+    def post(self, *args, **kwargs):
+        return super(_Browser, self).post(*args, verify = self.cacert_path, **kwargs)
+
 
 def _get_strings_percent_diff(str1, str2):
     return difflib.SequenceMatcher(None, str1, str2).ratio( )
@@ -41,12 +54,7 @@ def _get_similar_string_in_array(string, arr, percent):
 
 class _Response( ):
 
-    def __init__(self, url = False, raw_html = False):
-        if url:
-            response = browser.get(url)
-            self.raw_html = response.text
-            self.soup = response.soup if hasattr(response, "soup") else BeautifulSoup(response.text)
-        if raw_html:
+    def __init__(self, raw_html):
             self.raw_html = raw_html
             self.soup = BeautifulSoup(raw_html)
 
@@ -111,6 +119,12 @@ class _Response( ):
 
 class Breaker( ):
 
+    browser = _Browser()
+    HOST = "http://www.cambridgelms.org"
+
+    def set_cacert_path(self, path):
+        self.browser.set_cacert_path(path)
+
     @staticmethod
     def _validate_percent(percent_min, percent_max):
         return  (0 <= percent_min <= 100 and 0 <= percent_max <= 100 and percent_min <= percent_max)
@@ -133,12 +147,13 @@ class Breaker( ):
     def _get_tasks(self, unit_link):
 
         #ссылка на манифест с id заданий
-        manifest_link = HOST + unit_link + "cdsmmanifest.xml"
-        response = _Response(manifest_link)
+        manifest_link = self.HOST + unit_link + "cdsmmanifest.xml"
+        xml = self.browser.get(manifest_link).text
+        response = _Response(xml)
         items = response.get_items_from_xml( )
         #ссылка на xml с описаниями
-        desc_link = HOST + unit_link + "menu_info.xml"
-        response = browser.get(desc_link)
+        desc_link = self.HOST + unit_link + "menu_info.xml"
+        response = self.browser.get(desc_link)
         desc_soup = BeautifulSoup(response.text)
 
         tasks = [ ]
@@ -169,21 +184,23 @@ class Breaker( ):
     def _solve(self, unit_list, unit_num, percent_min, percent_max):
         #получаем динамически сгенерированный js
          #на первый запрос получаем редирект
-        response = browser.get( HOST+"/lms/mod/scorm/quickview.js.php?id="+str( unit_list[ unit_num - 1 ][ 'unit_id' ]) )
+        response = self.browser.get( self.HOST+"/lms/mod/scorm/quickview.js.php?id="+str( unit_list[ unit_num - 1 ][ 'unit_id' ]) )
         #теперь то что надо
-        #response = browser.get(response.soup.find( id="service" )[ 'value' ] )
+        #response = self.browser.get(response.soup.find( id="service" )[ 'value' ] )
         #ищем id, scoid и attempt
         params_url = response.soup.find( id="service" )[ 'value' ]
-        r = _Response( params_url )
-        _id = r.get_id( )
-        _scoid = r.get_scoid( )
-        _attempt = r.get_attempt( )
+        params_html = self.browser.get(params_url).text
+        response = _Response( params_html )
+        _id = response.get_id( )
+        _scoid = response.get_scoid( )
+        _attempt = response.get_attempt( )
         #ищем ссылку на юнит и достаем задания
-        unit_link = r.get_unit_link( )
+        unit_link = response.get_unit_link( )
         tasks = self._get_tasks(unit_link)
         #достаем sesskey
-        sesskey_url = HOST + "/lms/mod/scorm/api.php?id="+str(_id)+"&scoid="+str(_scoid)+"&attempt="+str(_attempt)
-        response = _Response(sesskey_url)
+        sesskey_url = self.HOST + "/lms/mod/scorm/api.php?id="+str(_id)+"&scoid="+str(_scoid)+"&attempt="+str(_attempt)
+        sesskey_html = self.browser.get(sesskey_url).text
+        response = _Response(sesskey_html)
         _sesskey = response.get_sesskey( )
 
         #формируем запрос для каждого задания
@@ -215,22 +232,22 @@ class Breaker( ):
                 'attempt' : _attempt,
             }
 
-            solved_params_url = HOST + "/lms/mod/scorm/api.php?id="+str( _id )+"&scoid="+str( _scoid + i )+"&attempt="+str( _attempt )
-            response = _Response(solved_params_url)
+            solved_params_url = self.HOST + "/lms/mod/scorm/api.php?id="+str( _id )+"&scoid="+str( _scoid + i )+"&attempt="+str( _attempt )
+            solved_params_html = self.browser.get(solved_params_url).text
+            response = _Response(solved_params_html)
 
-            solved_ids = r.get_solved_ids_list( )
-            solved_descs = r.get_solved_descs_list( )
-            solved_results = r.get_solved_results_list( )
+            solved_ids = response.get_solved_ids_list( )
+            solved_descs = response.get_solved_descs_list( )
+            solved_results = response.get_solved_results_list( )
 
             for j in range(0, len( solved_ids ) ):
                 #нужно чистое описание без экранирования. Сравниваем его с описанием, которое достали из xml. Если равны - то это задание уже было решено.
                 #не сравниваем по id т.к. не знаем точно, как сервер модифицирует id активити. В большенстве случаев сравнение удается, но иногда нет -- не рискуем.
-                desc = desc_list[ j ].replace("\\", "")
-                solved_descs.append( desc )
-                result = result_list[ j ]
+                solved_descs[ j ] = solved_descs[ j ].replace("\\", "")
+                result = solved_results[ j ]
                 if  result.strip() == "":
                     result = 0
-                solved_results.append( float( result ) )
+                solved_results[ j ] = float( result )
 
             results = [ ] #сохраним все рандомные проценты, чтобы потом вычеслить общий процент выполнения
 
@@ -279,9 +296,9 @@ class Breaker( ):
             body['cmi__score__scaled'] = score_scaled
             body['cmi__score__raw'] = score_raw
 
-            post_url = HOST+"/lms/mod/scorm/datamodel.php"
+            post_url = self.HOST+"/lms/mod/scorm/datamodel.php"
 
-            response = browser.post(post_url, body)
+            response = self.browser.post(post_url, body)
 
             if response.text.find("Success") < 0:
                raise LMS_UnknownError("Неизвестная ошибка")
@@ -289,22 +306,25 @@ class Breaker( ):
 
     def login(self, username, password): #использовать во внешних модулях
 
-        login_url = HOST + "/touchstone/p/splash"
-        respone = _Response( login_url )
+        login_url = self.HOST + "/touchstone/p/splash"
+        login_html = self.browser.get(login_url).text
+        response = _Response( login_html )
         #ссылка на iframe с формой входа
-        login_iframe_src = respone.get_login_iframe_src( )
-        #сама форма
-        response = _Response( login_iframe_src )
+        login_iframe_src = response.get_login_iframe_src( )
+        login_iframe_html = self.browser.get(login_iframe_src).text
+        response = _Response( login_iframe_html )
+
         login_form = response.get_login_form( )
-        #заполняем форму данными
         login_form.find(id="username")['value'] = username
         login_form.find(id="password")['value'] = password
         #пытаемся войти
-        response = browser.submit( login_form, HOST + "/touchstone/p"+login_form.attrs['action'] )
-        if _Response(raw_html = response.text).is_logged_in( ):
+        submit_html = self.browser.submit( login_form, self.HOST + "/touchstone/p"+login_form.attrs['action'] ).text
+        response = _Response(submit_html)
+        if response.is_logged_in( ):
             #получаем js редирект, переходим по нему
             redirect_url = response.soup.find(id="service")['value']
-            response = _Response(redirect_url)
+            redirect_html = self.browser.get(redirect_url).text
+            response = _Response(redirect_html)
 
             if not response.is_single_session( ): #lms не разрешает более одной сессии
                 raise LMS_SessionError("Сессия уже открыта")
@@ -313,10 +333,10 @@ class Breaker( ):
             raise LMS_LoginError("Неверный логин / пароль")
 
     def logout(self): #использовать во внешних модулях
-        browser.get(HOST+"/touchstone/p/caslogout")
+        self.browser.get(self.HOST+"/touchstone/p/caslogout")
 
     def get_units(self): #использовать во внешних модулях
-        response = browser.get(HOST+"/touchstone/p/frontpage")
+        response = self.browser.get(self.HOST+"/touchstone/p/frontpage")
         #находим блок со ссылкой на задания
         self_study_block = response.soup.find("div", {"class" : "instituion"})
         if not self_study_block:
@@ -326,8 +346,8 @@ class Breaker( ):
         #получаем ссылку на workbook
         wb_href = the_tr.find("a").attrs['href']
         #ссылка, по которой lms загружает список workbookов
-        pkg_url = HOST+wb_href+"/packages"
-        response = browser.get(pkg_url)
+        pkg_url = self.HOST+wb_href+"/packages"
+        response = self.browser.get(pkg_url)
         #получаем контейнер с юнитами
         unit_box = response.soup.find(id="scormbox-container")
         units = unit_box.findAll("div", {"class" : "scorm-box"})
