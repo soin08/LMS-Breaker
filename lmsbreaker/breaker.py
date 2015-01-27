@@ -62,7 +62,7 @@ class _Response( ):
         return not self.soup.find(id="username")
 
     def is_single_session(self): #есть лишь одна открытая сессия
-        return not self.soup.title.contents[0].find("Session limit exceeded") >= 0
+        return self.soup.title.contents[0].find("Session limit exceeded") < 0
 
     def get_items_from_xml(self):
         return self.soup.find("organization").find_all("item", recursive = False)[ 1 ]
@@ -91,6 +91,12 @@ class _Response( ):
         searchObj = re.search( r'sesskey=(.*)"', self.raw_html )
         _sesskey = searchObj.group(1)
         return _sesskey
+
+    def is_params_redirect(self):
+        return self.soup.find( id="service" )
+
+    def get_params_redirect_url(self):
+         return self.soup.find( id="service" )[ 'value' ]
 
     @staticmethod
     def _get_second_match_list(match_list):
@@ -189,12 +195,16 @@ class Breaker( ):
 
     def _solve(self, units, percent_min, percent_max):
          for unit in units:
-            #на первый запрос получаем редирект
-            response = self.browser.get( self.HOST+"/lms/mod/scorm/quickview.js.php?id="+str( unit[ 'unit_id' ] ) )
-            #теперь то что надо
-            params_url = response.soup.find( id="service" )[ 'value' ]
+            print("unit: %s" % str(unit))
+            params_url = self.HOST+"/lms/mod/scorm/quickview.js.php?id="+str( unit[ 'unit_id' ] )
             params_html = self.browser.get(params_url).text
-            response = _Response( params_html )
+            response = _Response(params_html)
+            #на первый запрос получаем редирект
+            if response.is_params_redirect():
+                params_url = response.get_params_redirect_url()
+                params_html = self.browser.get(params_url).text
+                response = _Response( params_html )
+
             _id = response.get_id( )
             _scoid = response.get_scoid( )
             _attempt = response.get_attempt( )
@@ -307,12 +317,12 @@ class Breaker( ):
 
 
     def login(self, username, password): #использовать во внешних модулях
-        ##########################################################################
-        ##если есть много сессий - то форму не получим, а получим редирект. доработать!##
-        ##########################################################################
         login_url = self.HOST + "/touchstone/p/splash"
         login_html = self.browser.get(login_url).text
         response = _Response( login_html )
+        #если уже вошли и имеем много сессий - то получим соответствущий редирект и сообщение
+        if not response.is_single_session():
+            raise LMS_SessionError("Сессия уже открыта")
         #ссылка на iframe с формой входа
         login_iframe_src = response.get_login_iframe_src( )
         login_iframe_html = self.browser.get(login_iframe_src).text
@@ -344,7 +354,7 @@ class Breaker( ):
         #находим блок со ссылкой на задания
         self_study_block = response.soup.find("div", {"class" : "instituion"})
         if not self_study_block:
-            raise LMS_UnknownError
+            raise LMS_UnknownError("Неизвестная ошибка")
 
         the_tr = self_study_block.find("tr", {"class" : "views-row-last"})
         #получаем ссылку на workbook
@@ -368,12 +378,9 @@ class Breaker( ):
 
     def attempt(self, unit_list, units_chosen, percent_min, percent_max): #использовать во внешних модулях
 
-        print("units chosen:")
-        print(units_chosen)
-
         if not Breaker._validate_units(unit_list, units_chosen):
-            raise LMS_UnitError
+            raise LMS_UnitError("Ошибка выбора задания")
         if not Breaker._validate_percent(percent_min, percent_max):
-            raise LMS_PercentError
+            raise LMS_PercentError("Ошибка значений процентов")
 
         self._solve(units_chosen, percent_min, percent_max)

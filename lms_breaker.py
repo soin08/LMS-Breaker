@@ -65,4 +65,4 @@ except LMS_UnknownError:
     print("Шамана племени Нес Пирс порозила молния! Его смерть останется на твоей ленивой совести, а юнит так и не был решен.")
 
 finally:
-     breaker.logout()
+    breaker.logout()
