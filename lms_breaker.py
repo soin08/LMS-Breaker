@@ -23,13 +23,15 @@ print("Пляшем с бубном...")
 try:
 
     breaker.login(username, password)
-    units = breaker.get_units()
+    units_aval = breaker.get_units()
 
     print("Доступные задания:")
-    for i in range(0, len(units)):
-        print("№%s : %s" % (str(i+1), units[ i ]['unit_title']))
+    for i in range(0, len(units_aval)):
+        print("№%s : %s" % (str(i+1), units_aval[ i ]['unit_title']))
 
     unit_num = input_int("№ задания-->")
+
+    units_chosen = [ units_aval[ unit_num - 1 ] ]
 
     print("Введи минимальный и максимальный процент выполнения каждого задания. Результат всегда будет между этими двумя значениями.")
 
@@ -38,7 +40,7 @@ try:
 
     print("Пляшем с бубном...")
 
-    breaker.attempt(units, unit_num, percent_min, percent_max)
+    breaker.attempt(units_aval, units_chosen, percent_min, percent_max)
 
     print("Шаман успешно решил адание "+str(unit_num))
     print("\"Каждое животное знает гораздо больше, чем ты\"")

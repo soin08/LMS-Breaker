@@ -117,6 +117,9 @@ class _Response( ):
     def get_login_form(self):
          return self.soup.find("form")
 
+    def is_post_successful(self):
+         return self.raw_html.find("Success") > 0
+
 class Breaker( ):
 
     browser = _Browser()
@@ -130,8 +133,11 @@ class Breaker( ):
         return  (0 <= percent_min <= 100 and 0 <= percent_max <= 100 and percent_min <= percent_max)
 
     @staticmethod
-    def _validate_unit(unit_list, unit_num):
-        return 0 < unit_num <= len(unit_list)
+    def _validate_units(unit_list, units_chosen):
+        for unit in units_chosen:
+            if not unit in unit_list:
+                return False
+        return True
 
     @staticmethod
     def _get_interaction_dict(num, _id, result, description, timestamp):
@@ -181,131 +187,129 @@ class Breaker( ):
 
         return tasks
 
-    def _solve(self, unit_list, unit_num, percent_min, percent_max):
-        #получаем динамически сгенерированный js
-         #на первый запрос получаем редирект
-        response = self.browser.get( self.HOST+"/lms/mod/scorm/quickview.js.php?id="+str( unit_list[ unit_num - 1 ][ 'unit_id' ]) )
-        #теперь то что надо
-        #response = self.browser.get(response.soup.find( id="service" )[ 'value' ] )
-        #ищем id, scoid и attempt
-        params_url = response.soup.find( id="service" )[ 'value' ]
-        params_html = self.browser.get(params_url).text
-        response = _Response( params_html )
-        _id = response.get_id( )
-        _scoid = response.get_scoid( )
-        _attempt = response.get_attempt( )
-        #ищем ссылку на юнит и достаем задания
-        unit_link = response.get_unit_link( )
-        tasks = self._get_tasks(unit_link)
-        #достаем sesskey
-        sesskey_url = self.HOST + "/lms/mod/scorm/api.php?id="+str(_id)+"&scoid="+str(_scoid)+"&attempt="+str(_attempt)
-        sesskey_html = self.browser.get(sesskey_url).text
-        response = _Response(sesskey_html)
-        _sesskey = response.get_sesskey( )
+    def _solve(self, units, percent_min, percent_max):
+         for unit in units:
+            #на первый запрос получаем редирект
+            response = self.browser.get( self.HOST+"/lms/mod/scorm/quickview.js.php?id="+str( unit[ 'unit_id' ] ) )
+            #теперь то что надо
+            params_url = response.soup.find( id="service" )[ 'value' ]
+            params_html = self.browser.get(params_url).text
+            response = _Response( params_html )
+            _id = response.get_id( )
+            _scoid = response.get_scoid( )
+            _attempt = response.get_attempt( )
+            unit_link = response.get_unit_link( )
+            tasks = self._get_tasks(unit_link)
+            sesskey_url = self.HOST + "/lms/mod/scorm/api.php?id="+str(_id)+"&scoid="+str(_scoid)+"&attempt="+str(_attempt)
+            sesskey_html = self.browser.get(sesskey_url).text
+            response = _Response(sesskey_html)
+            _sesskey = response.get_sesskey( )
 
-        #формируем запрос для каждого задания
-        for i in range(0, len( tasks ) ):
+            #формируем запрос для каждого задания
+            for i in range(0, len( tasks ) ):
 
-            activities_num = len(tasks[ i ]['activities'])
-            #как долго решали
-            minutes = random.randint(8, 20)
-            seconds = random.randint(0, 59)
+                activities_num = len(tasks[ i ]['activities'])
+                #как долго решали
+                minutes = random.randint(8, 20)
+                seconds = random.randint(0, 59)
 
-            if re.search(r'Before_you_begin', tasks[ i ]['title']): #раздел "Before you begin" всегда решаем на 100% - он слишком простой
-                minutes = random.randint(1, 3)
+                if re.search(r'Before_you_begin', tasks[ i ]['title']): #раздел "Before you begin" всегда решаем на 100% - он слишком простой
+                    minutes = random.randint(1, 3)
 
-            cmi__total_time = "PT"+str(minutes)+"M"+str(seconds)+"S"
+                cmi__total_time = "PT"+str(minutes)+"M"+str(seconds)+"S"
 
-            body = { #формируем запрос
-                'id' : _id,
-                'scoid' : _scoid + i,
-                'sesskey' : _sesskey,
-                'cmi__score__scaled' : 100, #ниже перезапишем с учетом percent_max и percent_min
-                'cmi__score__raw' : 100,
-                'cmi__score__min' : 0,
-                'cmi__score__max' : 100,
-                'cmi__total_time' : cmi__total_time,
-                'cmi__completion_status': "completed",
-                'cmi__exit': "suspend",
-                'cmi__progress_measure' : 1,
-                'cmi__success_status': "passed",
-                'attempt' : _attempt,
-            }
+                body = { #формируем запрос
+                    'id' : _id,
+                    'scoid' : _scoid + i,
+                    'sesskey' : _sesskey,
+                    'cmi__score__scaled' : 100, #ниже перезапишем с учетом percent_max и percent_min
+                    'cmi__score__raw' : 100,
+                    'cmi__score__min' : 0,
+                    'cmi__score__max' : 100,
+                    'cmi__total_time' : cmi__total_time,
+                    'cmi__completion_status': "completed",
+                    'cmi__exit': "suspend",
+                    'cmi__progress_measure' : 1,
+                    'cmi__success_status': "passed",
+                    'attempt' : _attempt,
+                }
 
-            solved_params_url = self.HOST + "/lms/mod/scorm/api.php?id="+str( _id )+"&scoid="+str( _scoid + i )+"&attempt="+str( _attempt )
-            solved_params_html = self.browser.get(solved_params_url).text
-            response = _Response(solved_params_html)
+                solved_params_url = self.HOST + "/lms/mod/scorm/api.php?id="+str( _id )+"&scoid="+str( _scoid + i )+"&attempt="+str( _attempt )
+                solved_params_html = self.browser.get(solved_params_url).text
+                response = _Response(solved_params_html)
 
-            solved_ids = response.get_solved_ids_list( )
-            solved_descs = response.get_solved_descs_list( )
-            solved_results = response.get_solved_results_list( )
+                solved_ids = response.get_solved_ids_list( )
+                solved_descs = response.get_solved_descs_list( )
+                solved_results = response.get_solved_results_list( )
 
-            for j in range(0, len( solved_ids ) ):
-                #нужно чистое описание без экранирования. Сравниваем его с описанием, которое достали из xml. Если равны - то это задание уже было решено.
-                #не сравниваем по id т.к. не знаем точно, как сервер модифицирует id активити. В большенстве случаев сравнение удается, но иногда нет -- не рискуем.
-                solved_descs[ j ] = solved_descs[ j ].replace("\\", "")
-                result = solved_results[ j ]
-                if  result.strip() == "":
-                    result = 0
-                solved_results[ j ] = float( result )
+                for j in range(0, len( solved_ids ) ):
+                    #нужно чистое описание без экранирования. Сравниваем его с описанием, которое достали из xml. Если равны - то это задание уже было решено.
+                    #не сравниваем по id т.к. не знаем точно, как сервер модифицирует id активити. В большенстве случаев сравнение удается, но иногда нет -- не рискуем.
+                    solved_descs[ j ] = solved_descs[ j ].replace("\\", "")
+                    result = solved_results[ j ]
+                    if  result.strip() == "":
+                        result = 0
+                    solved_results[ j ] = float( result )
 
-            results = [ ] #сохраним все рандомные проценты, чтобы потом вычеслить общий процент выполнения
+                results = [ ] #сохраним все рандомные проценты, чтобы потом вычеслить общий процент выполнения
 
-            #добавим в запрос сначала все уже решенные задания, чтобы не нарушать порядок заданий
-            for j in range(0, len(solved_ids)):
-                act_id = solved_ids[ j ]
-                act_result = random.randint(percent_min*10, percent_max*10) / 1000
-                act_desc = solved_descs[ j ].replace('"', r'\"').replace("'", r"\'")
-                minutes_spent = random.randint(5, 17)
-
-                if re.search(r'Before_you_begin', act_id):
-                    act_result = 1
-                    minutes_spent = minutes
-
-                if solved_results[ j ] > act_result:
-                    act_result = solved_results[ j ]
-
-                time_after_solving = datetime.datetime.now( ) + datetime.timedelta( minutes = minutes_spent )
-                act_timestamp = urllib.parse.quote_plus( time_after_solving.strftime("%y-%m-%dT%H:%M:%S") )
-                body.update( Breaker._get_interaction_dict(j, act_id, act_result, act_desc , act_timestamp) )
-                results.append( act_result )
-
-            #добавляем все остальные задания
-            counter = 0
-            for j in range(0, activities_num):
-                #с id путаница - проще проверять по описанию
-                solved_index = _get_similar_string_in_array( tasks[ i ][ 'activities' ][ j ][ 'desc' ], solved_descs, .85 )
-                if solved_index < 0: #новое задание которое не решали
-                    act_id = tasks[ i ]['activities'][ j ][ 'id' ]
+                #добавим в запрос сначала все уже решенные задания, чтобы не нарушать порядок заданий
+                for j in range(0, len(solved_ids)):
+                    act_id = solved_ids[ j ]
                     act_result = random.randint(percent_min*10, percent_max*10) / 1000
-                    act_desc = tasks[ i ]['activities'][ j ][ 'desc' ].replace('"', r'\"').replace("'", r"\'")
+                    act_desc = solved_descs[ j ].replace('"', r'\"').replace("'", r"\'")
                     minutes_spent = random.randint(5, 17)
 
                     if re.search(r'Before_you_begin', act_id):
                         act_result = 1
                         minutes_spent = minutes
 
-                    time_after_solving = datetime.datetime.now() + datetime.timedelta( minutes = minutes_spent )
+                    if solved_results[ j ] > act_result:
+                        act_result = solved_results[ j ]
+
+                    time_after_solving = datetime.datetime.now( ) + datetime.timedelta( minutes = minutes_spent )
                     act_timestamp = urllib.parse.quote_plus( time_after_solving.strftime("%y-%m-%dT%H:%M:%S") )
-                    body.update( Breaker._get_interaction_dict(len(solved_ids) + counter, act_id, act_result, act_desc, act_timestamp) )
+                    body.update( Breaker._get_interaction_dict(j, act_id, act_result, act_desc , act_timestamp) )
                     results.append( act_result )
-                    counter += 1
 
-            score_scaled = round(sum(results) / (activities_num * 1.0), 4)
-            score_raw = score_scaled * 100
-            body['cmi__score__scaled'] = score_scaled
-            body['cmi__score__raw'] = score_raw
+                #добавляем все остальные задания
+                counter = 0
+                for j in range(0, activities_num):
+                    #с id путаница - проще проверять по описанию
+                    solved_index = _get_similar_string_in_array( tasks[ i ][ 'activities' ][ j ][ 'desc' ], solved_descs, .85 )
+                    if solved_index < 0: #новое задание которое не решали
+                        act_id = tasks[ i ]['activities'][ j ][ 'id' ]
+                        act_result = random.randint(percent_min*10, percent_max*10) / 1000
+                        act_desc = tasks[ i ]['activities'][ j ][ 'desc' ].replace('"', r'\"').replace("'", r"\'")
+                        minutes_spent = random.randint(5, 17)
 
-            post_url = self.HOST+"/lms/mod/scorm/datamodel.php"
+                        if re.search(r'Before_you_begin', act_id):
+                            act_result = 1
+                            minutes_spent = minutes
 
-            response = self.browser.post(post_url, body)
+                        time_after_solving = datetime.datetime.now() + datetime.timedelta( minutes = minutes_spent )
+                        act_timestamp = urllib.parse.quote_plus( time_after_solving.strftime("%y-%m-%dT%H:%M:%S") )
+                        body.update( Breaker._get_interaction_dict(len(solved_ids) + counter, act_id, act_result, act_desc, act_timestamp) )
+                        results.append( act_result )
+                        counter += 1
 
-            if response.text.find("Success") < 0:
-               raise LMS_UnknownError("Неизвестная ошибка")
+                score_scaled = round(sum(results) / (activities_num * 1.0), 4)
+                score_raw = score_scaled * 100
+                body['cmi__score__scaled'] = score_scaled
+                body['cmi__score__raw'] = score_raw
+
+                post_url = self.HOST+"/lms/mod/scorm/datamodel.php"
+                post_html = self.browser.post(post_url, body).text
+                response = _Response(post_html)
+
+                if not response.is_post_successful():
+                     raise LMS_UnknownError("Неизвестная ошибка")
 
 
     def login(self, username, password): #использовать во внешних модулях
-
+        ##########################################################################
+        ##если есть много сессий - то форму не получим, а получим редирект. доработать!##
+        ##########################################################################
         login_url = self.HOST + "/touchstone/p/splash"
         login_html = self.browser.get(login_url).text
         response = _Response( login_html )
@@ -362,11 +366,14 @@ class Breaker( ):
 
         return unit_list
 
-    def attempt(self, unit_list, unit_num, percent_min, percent_max): #использовать во внешних модулях
+    def attempt(self, unit_list, units_chosen, percent_min, percent_max): #использовать во внешних модулях
 
-        if not Breaker._validate_unit(unit_list, unit_num):
+        print("units chosen:")
+        print(units_chosen)
+
+        if not Breaker._validate_units(unit_list, units_chosen):
             raise LMS_UnitError
         if not Breaker._validate_percent(percent_min, percent_max):
             raise LMS_PercentError
 
-        self._solve(unit_list, unit_num, percent_min, percent_max)
+        self._solve(units_chosen, percent_min, percent_max)
