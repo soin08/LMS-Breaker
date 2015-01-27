@@ -1,23 +1,33 @@
 # LMS-Breaker
 Решай любое задание из своего аккаунта на [cambridgelms.org] за считанные секунды.
 
-Скоро будет добавлен графический интерфейс.
+Доступен графический интерфейс.
 
 ***Внимание!*** Перед запуском необходимо закрыть вашу текущую сессию на сайте cambridgelms.org!
 
-Запуск из shell:
+### Запуск
+
+Запуск с графическим интерфейсом (GUI):
 ```sh
-$ python lms_breaker.py
+$ python lms_breaker_gui.py
 ```
 
-### Необходимые пакеты
+Запуск для работы из shell:
+```sh
+$ python lms_breaker_shell.py
+```
+
+Установочный файл для Windows скоро будет доступен.
+
+### Требования
 
 LMS-Breaker написан на Python 3 и использует следующие пакеты:
 
 - mechanicalsoup
 - BeautifulSoup
+- PyQt4 для GUI
 
 ### Версия
-1.0.1
+2.0
 
 [cambridgelms.org]:http://cambridgelms.org
