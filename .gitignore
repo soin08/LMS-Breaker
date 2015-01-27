@@ -38,8 +38,4 @@ Thumbs.db
 
 #Specifics #
 ######################
-*.ui
-login_window_ui.py
 setup.py
-main.py
-unit_selection_ui.py
