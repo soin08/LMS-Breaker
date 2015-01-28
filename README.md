@@ -26,6 +26,13 @@ LMS-Breaker написан на Python 3 и использует следующ�
 - mechanicalsoup
 - BeautifulSoup
 - PyQt4 для GUI
+- py2exe для генерации exe
+
+### Сборка
+
+```sh
+$ python setup.py py2exe
+```
 
 ### Версия
 2.0

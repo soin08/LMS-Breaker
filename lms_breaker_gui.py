@@ -1,20 +1,19 @@
 import sys
 import threading
-import logging
 from lmsbreaker import Breaker, LMS_BaseError
 from PyQt4.QtCore import pyqtSlot, Qt
 from PyQt4.QtGui import QApplication, QCursor
 from PyQt4 import QtCore, QtGui
 
-from lmsgui.login_window_ui import Ui_LoginWindow
-from lmsgui.unit_selection_ui import Ui_UnitSelection
+from lmsgui import Ui_LoginWindow
+from lmsgui import Ui_UnitSelection
 
-logging.basicConfig(level=logging.DEBUG,
-                    format='(%(threadName)-10s) %(message)s',
-                    )
+import os.path
 
 breaker = Breaker( )
-#breaker.set_cacert_path("cacert.pem")
+
+if os.path.exists("./breaker.exe"): #исполняется exe
+    breaker.set_cacert_path("cacert.pem")
 
 class Cursor:
 
@@ -68,7 +67,6 @@ class LoginWindow(QtGui.QWidget, Window):
         self.login_thread.start( )
 
     def fetch_units(self):
-        logging.debug("fetching units...")
         self.units_thread = UnitsThread()
         self.units_thread.unitsFetched.connect(self.on_units_fetched)
         self.units_thread.unitsFailed.connect(self.on_units_failed)
@@ -102,7 +100,6 @@ class LoginWindow(QtGui.QWidget, Window):
     @pyqtSlot(Exception)
     def on_units_failed(self, e):
         self.unset_waiting_ui()
-        logging.debug("units failed, error: %s" % str(e))
         if isinstance(e, LMS_BaseError):
             self.show_error(str(e))
         else:
@@ -111,8 +108,8 @@ class LoginWindow(QtGui.QWidget, Window):
     @pyqtSlot()
     def on_login_button_clicked(self):
         if not self.is_login_info_empty( ):
-            self.change_status("logging in...")
             self.set_waiting_ui()
+            self.change_status("logging in...")
             username = self.ui.line_username.text( )
             password = self.ui.line_password.text( )
             self.login(username, password)
@@ -137,6 +134,7 @@ class LoginWindow(QtGui.QWidget, Window):
         if isinstance(e, LMS_BaseError):
             self.show_error(str(e))
         else:
+            print(e)
             self.show_default_error()
         breaker.logout()
 
@@ -193,8 +191,6 @@ class UnitWindow(QtGui.QWidget, Window):
 
     @pyqtSlot(Exception)
     def on_attempt_failed(self, e):
-        logging.debug("attempt failed")
-        logging.debug(str(e))
         self.unset_waiting_ui()
         if isinstance(e, LMS_BaseError):
             self.show_error(str(e))
@@ -229,21 +225,15 @@ class LoginThread(QtCore.QThread):
     loginFailed = QtCore.pyqtSignal(Exception)
 
     def __init__(self, username, password):
-        logging.debug("init login thread")
         QtCore.QThread.__init__(self)
         self.username = username
         self.password = password
-        logging.debug("initialized")
 
     def run(self):
-        logging.debug("run called")
         try:
-            logging.debug("trying to login..")
             breaker.login(self.username, self.password)
-            logging.debug("tried..")
             self.loginSucceeded.emit()
         except Exception as e:
-            logging.debug("login failed")
             self.loginFailed.emit(e)
 
 
@@ -252,20 +242,13 @@ class UnitsThread(QtCore.QThread):
     unitsFailed = QtCore.pyqtSignal( Exception )
 
     def __init__(self):
-        logging.debug("init units thread")
         QtCore.QThread.__init__(self)
 
     def run(self):
         try:
-            logging.debug("trying to fetch units..")
             units = breaker.get_units()
-            #print("printing units:")
-            #print(units)
-            logging.debug("tried..")
             self.unitsFetched.emit(units)
         except Exception as e:
-            logging.debug("units failed")
-            logging.debug(e)
             self.unitsFailed.emit(e)
 
 
@@ -282,12 +265,9 @@ class AttemptThread(QtCore.QThread):
 
     def run(self):
         try:
-            logging.debug("attempting..")
             breaker.attempt(self.units_aval, self.units_chosen, self.percent_min, self.percent_max)
-            logging.debug("attempted..")
             self.attemptSucceeded.emit()
         except Exception as e:
-            logging.debug("attempt failed")
             self.attemptFailed.emit(e)
 
 
