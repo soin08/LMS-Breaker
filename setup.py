@@ -19,6 +19,7 @@ setup (
     windows = [{
                         'script' : 'lms_breaker_gui.py',
                         'dest_base' : 'breaker',
+                        "icon_resources": [(1, "icon.ico")],
                         }],
     zipfile = None,
     )

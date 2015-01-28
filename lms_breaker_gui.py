@@ -131,6 +131,7 @@ class LoginWindow(QtGui.QWidget, Window):
     @pyqtSlot(Exception)
     def on_login_failed(self, e):
         self.unset_waiting_ui()
+        self.change_status("enter username and password.")
         if isinstance(e, LMS_BaseError):
             self.show_error(str(e))
         else:
