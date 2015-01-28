@@ -26,6 +26,10 @@ class LMS_UnitError(LMS_BaseError):
 class LMS_PercentError(LMS_BaseError):
     pass
 
+class LMS_MaintanceError(LMS_BaseError):
+    pass
+
+
 class _Browser(mechanicalsoup.Browser):
     def __init__(self,  *args, **kwargs):
         super(_Browser, self).__init__( *args, **kwargs)
@@ -61,8 +65,11 @@ class _Response( ):
     def is_logged_in(self): #при неудачной попытке входа получаем ту-же форму, при удачной -- редирект
         return not self.soup.find(id="username")
 
-    def is_single_session(self): #есть лишь одна открытая сессия
-        return self.soup.title.contents[0].find("Session limit exceeded") < 0
+    def is_multiple_session(self): #есть лишь одна открытая сессия
+        return self.soup.title.contents[0].find("Session limit exceeded") > 0
+
+    def is_maintance(self): #иногда сайт на ремонте
+        return self.raw_html.find("undergoing maintance") > 0
 
     def get_items_from_xml(self):
         return self.soup.find("organization").find_all("item", recursive = False)[ 1 ]
@@ -321,8 +328,11 @@ class Breaker( ):
         login_html = self.browser.get(login_url).text
         response = _Response( login_html )
         #если уже вошли и имеем много сессий - то получим соответствущий редирект и сообщение
-        if not response.is_single_session():
+        if response.is_multiple_session():
             raise LMS_SessionError("Сессия уже открыта")
+
+        if response.is_maintance():
+            raise LMS_MaintanceError("Сайт LMS на ремонте. Попробуйте позднее.")
         #ссылка на iframe с формой входа
         login_iframe_src = response.get_login_iframe_src( )
         login_iframe_html = self.browser.get(login_iframe_src).text
@@ -340,7 +350,7 @@ class Breaker( ):
             redirect_html = self.browser.get(redirect_url).text
             response = _Response(redirect_html)
 
-            if not response.is_single_session( ): #lms не разрешает более одной сессии
+            if response.is_multiple_session( ): #lms не разрешает более одной сессии
                 raise LMS_SessionError("Сессия уже открыта")
 
         else:
