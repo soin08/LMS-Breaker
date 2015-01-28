@@ -55,9 +55,6 @@ class LoginWindow(QtGui.QWidget, Window):
         self.ui.line_username.returnPressed.connect(self.on_login_button_clicked)
         self.ui.line_password.returnPressed.connect(self.on_login_button_clicked)
 
-        self.ui.line_username.setText("isoin")
-        self.ui.line_password.setText("1September!")
-
     def is_login_info_empty(self):
         username = self.ui.line_username.text( )
         password = self.ui.line_password.text( )
