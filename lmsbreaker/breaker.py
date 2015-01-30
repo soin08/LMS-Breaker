@@ -135,11 +135,20 @@ class _Response( ):
 
 class Breaker( ):
 
-    browser = _Browser()
+    _browser = _Browser()
     HOST = "http://www.cambridgelms.org"
 
     def set_cacert_path(self, path):
-        self.browser.set_cacert_path(path)
+        self._browser.set_cacert_path(path)
+
+    def _browser_get(self, server_addr):
+        return self._browser.get(server_addr).text
+
+    def _browser_post(self, post_addr, body):
+        return self._browser.post(post_addr, body).text
+
+    def _browser_submit(self, form, submit_addr):
+        return self._browser.submit(form, submit_addr).text
 
     @staticmethod
     def _validate_percent(percent_min, percent_max):
@@ -167,13 +176,13 @@ class Breaker( ):
 
         #ссылка на манифест с id заданий
         manifest_link = self.HOST + unit_link + "cdsmmanifest.xml"
-        xml = self.browser.get(manifest_link).text
+        xml = self._browser_get(manifest_link)
         response = _Response(xml)
         items = response.get_items_from_xml( )
         #ссылка на xml с описаниями
         desc_link = self.HOST + unit_link + "menu_info.xml"
-        response = self.browser.get(desc_link)
-        desc_soup = BeautifulSoup(response.text)
+        response = self._browser_get(desc_link)
+        desc_soup = BeautifulSoup(response)
 
         tasks = [ ]
 
@@ -202,14 +211,13 @@ class Breaker( ):
 
     def _solve(self, units, percent_min, percent_max):
          for unit in units:
-            print("unit: %s" % str(unit))
             params_url = self.HOST+"/lms/mod/scorm/quickview.js.php?id="+str( unit[ 'unit_id' ] )
-            params_html = self.browser.get(params_url).text
+            params_html = self._browser_get(params_url)
             response = _Response(params_html)
             #на первый запрос получаем редирект
             if response.is_params_redirect():
                 params_url = response.get_params_redirect_url()
-                params_html = self.browser.get(params_url).text
+                params_html = self._browser_get(params_url)
                 response = _Response( params_html )
 
             _id = response.get_id( )
@@ -218,7 +226,7 @@ class Breaker( ):
             unit_link = response.get_unit_link( )
             tasks = self._get_tasks(unit_link)
             sesskey_url = self.HOST + "/lms/mod/scorm/api.php?id="+str(_id)+"&scoid="+str(_scoid)+"&attempt="+str(_attempt)
-            sesskey_html = self.browser.get(sesskey_url).text
+            sesskey_html = self._browser_get(sesskey_url)
             response = _Response(sesskey_html)
             _sesskey = response.get_sesskey( )
 
@@ -252,7 +260,7 @@ class Breaker( ):
                 }
 
                 solved_params_url = self.HOST + "/lms/mod/scorm/api.php?id="+str( _id )+"&scoid="+str( _scoid + i )+"&attempt="+str( _attempt )
-                solved_params_html = self.browser.get(solved_params_url).text
+                solved_params_html = self._browser_get(solved_params_url)
                 response = _Response(solved_params_html)
 
                 solved_ids = response.get_solved_ids_list( )
@@ -316,7 +324,7 @@ class Breaker( ):
                 body['cmi__score__raw'] = score_raw
 
                 post_url = self.HOST+"/lms/mod/scorm/datamodel.php"
-                post_html = self.browser.post(post_url, body).text
+                post_html = self._browser_post(post_url, body)
                 response = _Response(post_html)
 
                 if not response.is_post_successful():
@@ -325,7 +333,7 @@ class Breaker( ):
 
     def login(self, username, password): #использовать во внешних модулях
         login_url = self.HOST + "/touchstone/p/splash"
-        login_html = self.browser.get(login_url).text
+        login_html = self._browser_get(login_url)
         response = _Response( login_html )
         #если уже вошли и имеем много сессий - то получим соответствущий редирект и сообщение
         if response.is_multiple_session():
@@ -335,19 +343,19 @@ class Breaker( ):
             raise LMS_MaintanceError("Сайт LMS на ремонте. Попробуйте позднее.")
         #ссылка на iframe с формой входа
         login_iframe_src = response.get_login_iframe_src( )
-        login_iframe_html = self.browser.get(login_iframe_src).text
+        login_iframe_html = self._browser_get(login_iframe_src)
         response = _Response( login_iframe_html )
 
         login_form = response.get_login_form( )
         login_form.find(id="username")['value'] = username
         login_form.find(id="password")['value'] = password
         #пытаемся войти
-        submit_html = self.browser.submit( login_form, self.HOST + "/touchstone/p"+login_form.attrs['action'] ).text
+        submit_html = self._browser_submit( login_form, self.HOST + "/touchstone/p"+login_form.attrs['action'] )
         response = _Response(submit_html)
         if response.is_logged_in( ):
             #получаем js редирект, переходим по нему
             redirect_url = response.soup.find(id="service")['value']
-            redirect_html = self.browser.get(redirect_url).text
+            redirect_html = self._browser_get(redirect_url)
             response = _Response(redirect_html)
 
             if response.is_multiple_session( ): #lms не разрешает более одной сессии
@@ -357,10 +365,12 @@ class Breaker( ):
             raise LMS_LoginError("Неверный логин / пароль")
 
     def logout(self): #использовать во внешних модулях
-        self.browser.get(self.HOST+"/touchstone/p/caslogout")
+        self._browser_get(self.HOST+"/touchstone/p/caslogout")
 
     def get_units(self): #использовать во внешних модулях
-        response = self.browser.get(self.HOST+"/touchstone/p/frontpage")
+        units_url = self.HOST+"/touchstone/p/frontpage"
+        units_html = self._browser_get(units_url)
+        response = _Response(units_html)
         #находим блок со ссылкой на задания
         self_study_block = response.soup.find("div", {"class" : "instituion"})
         if not self_study_block:
@@ -371,7 +381,8 @@ class Breaker( ):
         wb_href = the_tr.find("a").attrs['href']
         #ссылка, по которой lms загружает список workbookов
         pkg_url = self.HOST+wb_href+"/packages"
-        response = self.browser.get(pkg_url)
+        pkg_html = self._browser_get(pkg_url)
+        response = _Response(pkg_html)
         #получаем контейнер с юнитами
         unit_box = response.soup.find(id="scormbox-container")
         units = unit_box.findAll("div", {"class" : "scorm-box"})
