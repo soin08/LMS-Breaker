@@ -211,6 +211,7 @@ class Breaker( ):
 
     def _solve(self, units, percent_min, percent_max):
          for unit in units:
+
             params_url = self.HOST+"/lms/mod/scorm/quickview.js.php?id="+str( unit[ 'unit_id' ] )
             params_html = self._browser_get(params_url)
             response = _Response(params_html)
@@ -231,7 +232,7 @@ class Breaker( ):
             _sesskey = response.get_sesskey( )
 
             #формируем запрос для каждого задания
-            for i in range(0, len( tasks ) ):
+            for i in range(len( tasks ) ):
 
                 activities_num = len(tasks[ i ]['activities'])
                 #как долго решали
@@ -392,7 +393,8 @@ class Breaker( ):
             unit_a = unit.find("h3").find("a")
             unit_title = unit_a.get_text( )
             unit_url = unit_a.attrs[ 'href' ]
-            unit_id = int(unit_url[ len( unit_url ) - 4 : ]) #4 последних символа
+            searchObj = re.search( r'id=([0-9]+)', unit_url )
+            unit_id = int(searchObj.group(1))
             unit_list.append( { 'unit_title' : unit_title, 'unit_id' : unit_id } )
 
         return unit_list
