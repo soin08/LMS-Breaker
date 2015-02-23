@@ -2,7 +2,7 @@
 ; SEE THE DOCUMENTATION FOR DETAILS ON CREATING INNO SETUP SCRIPT FILES!
 
 #define MyAppName "LMS Breaker"
-#define MyAppVersion "2.1"
+#define MyAppVersion "2.2"
 #define MyAppPublisher "soin08"
 #define MyAppURL "http://soin.rocks"
 #define MyAppExeName "breaker.exe"
@@ -23,7 +23,7 @@ DefaultDirName={pf}\{#MyAppName}
 DefaultGroupName={#MyAppName}
 LicenseFile=E:\_repos\lms_breaker\LICENSE.txt
 OutputDir=E:\_repos\lms_breaker
-OutputBaseFilename=breaker21-setup
+OutputBaseFilename=breaker22-setup
 SetupIconFile=E:\_repos\lms_breaker\icon.ico
 Compression=lzma
 SolidCompression=yes
