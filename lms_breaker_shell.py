@@ -42,7 +42,7 @@ try:
 
     breaker.attempt(units_aval, units_chosen, percent_min, percent_max)
 
-    print("Шаман успешно решил адание "+str(unit_num))
+    print("Шаман успешно решил задание "+str(unit_num))
     print("\"Каждое животное знает гораздо больше, чем ты\"")
     print("                               Племя Нес Пирс")
 
