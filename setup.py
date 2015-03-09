@@ -5,7 +5,7 @@ import py2exe
 setup (
     name='LMS Breaker',
     description="Решает любое задание на платформе Cambridge LMS за несколько секунд.",
-    version="2.2",
+    version="2.3",
     data_files = [ ( '', [ requests.certs.where() ] ) ],
     #console=[{'script': 'main.py'}],
     options={ 'py2exe': {

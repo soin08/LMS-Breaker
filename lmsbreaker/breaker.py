@@ -319,17 +319,23 @@ class Breaker( ):
                         results.append( act_result )
                         counter += 1
 
-                score_scaled = round(sum(results) / (activities_num * 1.0), 4)
-                score_raw = score_scaled * 100
-                body['cmi__score__scaled'] = score_scaled
-                body['cmi__score__raw'] = score_raw
+                #if activities_num == 0: #например Progress Check
 
-                post_url = self.HOST+"/lms/mod/scorm/datamodel.php"
-                post_html = self._browser_post(post_url, body)
-                response = _Response(post_html)
 
-                if not response.is_post_successful():
-                     raise LMS_UnknownError("Неизвестная ошибка")
+                #pprint.pprint(results)
+
+                if activities_num > 0:
+                    score_scaled = round(sum(results) / (activities_num * 1.0), 4)
+                    score_raw = score_scaled * 100
+                    body['cmi__score__scaled'] = score_scaled
+                    body['cmi__score__raw'] = score_raw
+
+                    post_url = self.HOST+"/lms/mod/scorm/datamodel.php"
+                    post_html = self._browser_post(post_url, body)
+                    response = _Response(post_html)
+
+                    if not response.is_post_successful():
+                         raise LMS_UnknownError("Неизвестная ошибка")
 
 
     def login(self, username, password): #использовать во внешних модулях
