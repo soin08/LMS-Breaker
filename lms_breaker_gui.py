@@ -135,7 +135,6 @@ class LoginWindow(QtGui.QWidget, Window):
         if isinstance(e, LMS_BaseError):
             self.show_error(str(e))
         else:
-            print(e)
             self.show_default_error()
         breaker.logout()
 
