@@ -10,7 +10,7 @@ from lmsgui import Ui_UnitSelection
 
 import os.path
 
-breaker = Breaker( )
+breaker = Breaker()
 
 if os.path.exists("./breaker.exe"): #исполняется exe
     breaker.set_cacert_path("cacert.pem")
@@ -35,7 +35,7 @@ class Window:
         self.show_message("Ошибка", message)
 
     def show_default_error(self):
-        self.show_error("Произошла неизвестная ошибка. Найдите файл с расширением .log в каталоге программы и отправьте разработчику для выяснения причины ошибки и разработки патча.")
+        self.show_error("Произошла неизвестная ошибка.")
 
     def change_status(self, status):
         self.ui.label_status_msg.setText(status)
@@ -55,22 +55,22 @@ class LoginWindow(QtGui.QWidget, Window):
         self.ui.line_password.returnPressed.connect(self.on_login_button_clicked)
 
     def is_login_info_empty(self):
-        username = self.ui.line_username.text( )
-        password = self.ui.line_password.text( )
-        return not ( len( password.strip(" ") ) > 0 and len( username.strip(" ") ) ) > 0
+        username = self.ui.line_username.text()
+        password = self.ui.line_password.text()
+        return not (len( password.strip(" ")) > 0 and len( username.strip(" "))) > 0
 
 
     def login(self, username, password):
         self.login_thread = LoginThread(username, password)
         self.login_thread.loginSucceeded.connect(self.on_login_succeeded)
         self.login_thread.loginFailed.connect(self.on_login_failed)
-        self.login_thread.start( )
+        self.login_thread.start()
 
     def fetch_units(self):
         self.units_thread = UnitsThread()
         self.units_thread.unitsFetched.connect(self.on_units_fetched)
         self.units_thread.unitsFailed.connect(self.on_units_failed)
-        self.units_thread.start( )
+        self.units_thread.start()
 
     def disable_ui(self):
         self.ui.line_username.setEnabled(False)
@@ -107,18 +107,18 @@ class LoginWindow(QtGui.QWidget, Window):
 
     @pyqtSlot()
     def on_login_button_clicked(self):
-        if not self.is_login_info_empty( ):
+        if not self.is_login_info_empty():
             self.set_waiting_ui()
             self.change_status("logging in...")
-            username = self.ui.line_username.text( )
-            password = self.ui.line_password.text( )
+            username = self.ui.line_username.text()
+            password = self.ui.line_password.text()
             self.login(username, password)
         else :
             self.show_error("Введите логин / пароль")
 
     @pyqtSlot(str)
     def on_login_line_changed(self, string):
-        if not self.is_login_info_empty( ):
+        if not self.is_login_info_empty():
             self.change_status("ready to login.")
         else:
             self.change_status("enter username and password.")
@@ -151,7 +151,7 @@ class UnitWindow(QtGui.QWidget, Window):
         w = QtGui.QWidget(self)
         self.ui.vbox = QtGui.QVBoxLayout(w)
         for index, value in enumerate(units):
-            c = QtGui.QCheckBox( value[ 'unit_title' ] )
+            c = QtGui.QCheckBox(value['unit_title'])
             c.setObjectName("unit_" + str(index))
             self.ui.vbox.addWidget(c)
         self.ui.scroll_area.setWidget(w)
@@ -205,23 +205,22 @@ class UnitWindow(QtGui.QWidget, Window):
             percent_min = self.ui.spinbox_min_percent.value()
             percent_max = self.ui.spinbox_max_percent.value()
             self.start_attempt(sel_units, percent_min, percent_max)
-            #self.on_attempt_succeeded()
         else:
             self.show_error("Выберите юниты")
 
     def get_selected_units(self):
-        units_chosen = [ ]
+        units_chosen = []
         for i in range(self.ui.vbox.count()):
             c = self.ui.vbox.itemAt(i).widget()
             if c.isChecked():
-                units_chosen.append( self.units[ i ] )
+                units_chosen.append( self.units[i])
         return units_chosen
 
     def closeEvent(self, event):
         pass
 
 class LoginThread(QtCore.QThread):
-    loginSucceeded = QtCore.pyqtSignal( )
+    loginSucceeded = QtCore.pyqtSignal()
     loginFailed = QtCore.pyqtSignal(Exception)
 
     def __init__(self, username, password):
@@ -238,8 +237,8 @@ class LoginThread(QtCore.QThread):
 
 
 class UnitsThread(QtCore.QThread):
-    unitsFetched = QtCore.pyqtSignal(list )
-    unitsFailed = QtCore.pyqtSignal( Exception )
+    unitsFetched = QtCore.pyqtSignal(list)
+    unitsFailed = QtCore.pyqtSignal(Exception)
 
     def __init__(self):
         QtCore.QThread.__init__(self)
@@ -253,8 +252,8 @@ class UnitsThread(QtCore.QThread):
 
 
 class AttemptThread(QtCore.QThread):
-    attemptSucceeded = QtCore.pyqtSignal( )
-    attemptFailed = QtCore.pyqtSignal( Exception )
+    attemptSucceeded = QtCore.pyqtSignal()
+    attemptFailed = QtCore.pyqtSignal(Exception)
 
     def __init__(self, units_aval, units_chosen, percent_min, percent_max):
         QtCore.QThread.__init__(self)
@@ -279,4 +278,3 @@ if __name__ == "__main__":
         sys.exit(app.exec_())
     except SystemExit:
         breaker.logout()
-

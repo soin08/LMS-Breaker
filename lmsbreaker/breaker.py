@@ -33,7 +33,7 @@ class LMS_MaintanceError(LMS_BaseError):
 class _Browser(mechanicalsoup.Browser):
     def __init__(self,  *args, **kwargs):
         super(_Browser, self).__init__( *args, **kwargs)
-        self.cacert_path = requests.certs.where( )
+        self.cacert_path = requests.certs.where()
 
     def set_cacert_path(self, path):
         self.cacert_path = path
@@ -46,23 +46,23 @@ class _Browser(mechanicalsoup.Browser):
 
 
 def _get_strings_percent_diff(str1, str2):
-    return difflib.SequenceMatcher(None, str1, str2).ratio( )
+    return difflib.SequenceMatcher(None, str1, str2).ratio()
 
 def _get_similar_string_in_array(string, arr, percent):
     r = -1
-    for i in range(0, len(arr)):
-        if _get_strings_percent_diff(string, arr[ i ]) > percent :
+    for i in range(len(arr)):
+        if _get_strings_percent_diff(string, arr[i]) > percent :
             r = i
             break
     return r
 
-class _Response( ):
+class _Response():
 
     def __init__(self, raw_html):
             self.raw_html = raw_html
             self.soup = BeautifulSoup(raw_html)
 
-     #при неудачной попытке входа получаем ту-же форму, при удачной -- редирект
+    #при неудачной попытке входа получаем ту-же форму, при удачной -- редирект
     def is_logged_in(self):
         return not self.soup.find(id="username")
 
@@ -75,7 +75,7 @@ class _Response( ):
         return self.raw_html.find("undergoing maintance") > 0
 
     def get_items_from_xml(self):
-        return self.soup.find("organization").find_all("item", recursive = False)[1]
+        return self.soup.find("organization").find_all("item", recursive=False)[1]
 
     def get_unit_link(self):
         unitObj =  re.search(r'moo_quick_scorm_sco_urlMap\[(.*?)\] = \'(.*)\';', self.raw_html)
@@ -84,32 +84,31 @@ class _Response( ):
 
     def get_id(self):
         searchObj = re.search(r'id=([0-9]+)&scoid=([0-9]+)&attempt=([0-9]+)', self.raw_html)
-        _id = int(searchObj.group(1))
-        return _id
+        id = int(searchObj.group(1))
+        return id
 
     def get_scoid(self):
         searchObj = re.search(r'id=([0-9]+)&scoid=([0-9]+)&attempt=([0-9]+)', self.raw_html)
-        _scoid = int(searchObj.group(2)) + 2
-        return _scoid
+        scoid = int(searchObj.group(2)) + 2
+        return scoid
 
     def get_attempt(self):
         searchObj = re.search(r'id=([0-9]+)&scoid=([0-9]+)&attempt=([0-9]+)', self.raw_html)
-        _attempt = int(searchObj.group(3))
-        return _attempt
+        attempt = int(searchObj.group(3))
+        return attempt
 
     def get_sesskey(self):
         searchObj = re.search(r'sesskey=(.*)"', self.raw_html)
-        _sesskey = searchObj.group(1)
-        return _sesskey
+        sesskey = searchObj.group(1)
+        return sesskey
 
     def is_params_redirect(self):
         return self.soup.find(id="service")
 
     def get_params_redirect_url(self):
-         return self.soup.find(id="service")[ 'value' ]
+         return self.soup.find(id="service")['value']
 
-    @staticmethod
-    def _get_second_match_list(match_list):
+    def _get_second_match_list(self, match_list):
         second_match_list = []
         for i in range(len(match_list)):
             second_match_list.append(match_list[i][1])
@@ -117,15 +116,15 @@ class _Response( ):
 
     def get_solved_ids_list(self):
         id_list = re.findall(r'interactions.N([0-9]+).id = \'(.*?)\';', self.raw_html) #находим id
-        return _Response._get_second_match_list(id_list)
+        return self._get_second_match_list(id_list)
 
     def get_solved_descs_list(self):
         desc_list = re.findall(r'interactions.N([0-9]+).description = \'(.*?)\';', self.raw_html) #находим описания
-        return _Response._get_second_match_list(desc_list)
+        return self._get_second_match_list(desc_list)
 
     def get_solved_results_list(self):
         result_list = re.findall(r'interactions.N([0-9]+).result = \'(.*?)\';', self.raw_html) #находим результаты
-        return _Response._get_second_match_list(result_list)
+        return self._get_second_match_list(result_list)
 
     def get_login_iframe_src(self):
           return self.soup.find(id="cas_iframe").attrs['src']
@@ -136,10 +135,11 @@ class _Response( ):
     def is_post_successful(self):
          return self.raw_html.find("Success") > 0
 
-class Breaker( ):
+class Breaker():
 
-    _browser = _Browser()
-    HOST = "http://www.cambridgelms.org"
+    def __init__(self):
+        self._browser = _Browser()
+        self.HOST = "http://www.cambridgelms.org"
 
     def set_cacert_path(self, path):
         self._browser.set_cacert_path(path)
@@ -165,38 +165,36 @@ class Breaker( ):
         return True
 
     @staticmethod
-    def _get_interaction_dict(num, _id, result, description, timestamp):
+    def _get_interaction_dict(num, id, result, description, timestamp):
         return  {
-                    'cmi__interactions__'+str(num)+'__id': _id,
-                    'cmi__interactions__'+str(num)+'__result' : result,
-                    #можно отправить любую строку - будет видно на сайте
-                    'cmi__interactions__'+str(num)+'__description' : description,
-                    'cmi__interactions__'+str(num)+'__latency' : "",
-                    #это время не показывается на сайте, но для надежности установим и его
-                    'cmi__interactions__'+str(num)+'__timestamp' : timestamp,
-                }
-
+            'cmi__interactions__'+str(num)+'__id': id,
+            'cmi__interactions__'+str(num)+'__result' : result,
+            #можно отправить любую строку - будет видно на сайте
+            'cmi__interactions__'+str(num)+'__description' : description,
+            'cmi__interactions__'+str(num)+'__latency' : "",
+            #это время не показывается на сайте, но для надежности установим и его
+            'cmi__interactions__'+str(num)+'__timestamp' : timestamp,
+        }
 
     def _get_tasks(self, unit_link):
         #ссылка на манифест с id заданий
         manifest_link = self.HOST + unit_link + "cdsmmanifest.xml"
         xml = self._browser_get(manifest_link)
         response = _Response(xml)
-        items = response.get_items_from_xml( )
+        items = response.get_items_from_xml()
         #ссылка на xml с описаниями
         desc_link = self.HOST + unit_link + "menu_info.xml"
         response = self._browser_get(desc_link)
         desc_soup = BeautifulSoup(response)
 
-        tasks = [ ]
+        tasks = []
 
         for item in items:
             task_title = item.find("title")
             if type(task_title) is Tag:
-
                 the_title = task_title.get_text().replace(" ", "_").replace('"', r'\"').replace("'", "\'")
-                task = { 'title' : the_title, 'activities' : [ ] }
-                activities = item.find_all("item",  recursive = False)
+                task = {'title' : the_title, 'activities' : []}
+                activities = item.find_all("item",  recursive=False)
 
                 for activity in activities:
                     #id для post-запроса - заголовок с нижним подчеркиванием вместо пробелов
@@ -205,8 +203,8 @@ class Breaker( ):
                     act_desc_id = activity['identifier']
                     desc_node = desc_soup.find(id=act_desc_id)
                     if desc_node: #почему-то иногда к активити нет описания (наблюдается в 12м юните)
-                        act_desc = desc_node.find("learning_objective").get_text( )
-                        act = { 'id' : act_id, 'desc' : act_desc }
+                        act_desc = desc_node.find("learning_objective").get_text()
+                        act = {'id' : act_id, 'desc' : act_desc}
                         task['activities'].append(act)
 
                 tasks.append(task)
@@ -215,7 +213,7 @@ class Breaker( ):
 
     def _solve(self, units, percent_min, percent_max):
          for unit in units:
-            params_url = self.HOST+"/lms/mod/scorm/quickview.js.php?id="+str(unit[ 'unit_id' ])
+            params_url = self.HOST+"/lms/mod/scorm/quickview.js.php?id="+str(unit['unit_id'])
             params_html = self._browser_get(params_url)
             response = _Response(params_html)
             #на первый запрос получаем редирект
@@ -224,15 +222,15 @@ class Breaker( ):
                 params_html = self._browser_get(params_url)
                 response = _Response(params_html)
 
-            _id = response.get_id()
-            _scoid = response.get_scoid()
-            _attempt = response.get_attempt()
+            id = response.get_id()
+            scoid = response.get_scoid()
+            attempt = response.get_attempt()
             unit_link = response.get_unit_link()
             tasks = self._get_tasks(unit_link)
-            sesskey_url = self.HOST + "/lms/mod/scorm/api.php?id="+str(_id)+"&scoid="+str(_scoid)+"&attempt="+str(_attempt)
+            sesskey_url = self.HOST + "/lms/mod/scorm/api.php?id="+str(id)+"&scoid="+str(scoid)+"&attempt="+str(attempt)
             sesskey_html = self._browser_get(sesskey_url)
             response = _Response(sesskey_html)
-            _sesskey = response.get_sesskey()
+            sesskey = response.get_sesskey()
 
             #формируем запрос для каждого задания
             for i in range(len(tasks)):
@@ -247,9 +245,9 @@ class Breaker( ):
                 cmi__total_time = "PT"+str(minutes)+"M"+str(seconds)+"S"
                 #формируем запрос
                 body = {
-                    'id' : _id,
-                    'scoid' : _scoid + i,
-                    'sesskey' : _sesskey,
+                    'id' : id,
+                    'scoid' : scoid + i,
+                    'sesskey' : sesskey,
                     'cmi__score__scaled' : 100, #ниже перезапишем с учетом percent_max и percent_min
                     'cmi__score__raw' : 100,
                     'cmi__score__min' : 0,
@@ -259,10 +257,10 @@ class Breaker( ):
                     'cmi__exit': "suspend",
                     'cmi__progress_measure' : 1,
                     'cmi__success_status': "passed",
-                    'attempt' : _attempt,
+                    'attempt' : attempt,
                 }
 
-                solved_params_url = self.HOST + "/lms/mod/scorm/api.php?id="+str(_id)+"&scoid="+str(_scoid + i)+"&attempt="+str(_attempt)
+                solved_params_url = self.HOST + "/lms/mod/scorm/api.php?id="+str(id)+"&scoid="+str(scoid + i)+"&attempt="+str(attempt)
                 solved_params_html = self._browser_get(solved_params_url)
                 response = _Response(solved_params_html)
 
@@ -271,41 +269,46 @@ class Breaker( ):
                 solved_results = response.get_solved_results_list()
 
                 for j in range(0, len(solved_ids)):
-                    #нужно чистое описание без экранирования. Сравниваем его с описанием, которое достали из xml.
-                    #Если равны - то это задание уже было решено.
-                    #не сравниваем по id т.к. не знаем точно, как сервер модифицирует id активити.
-                    #В большенстве случаев сравнение удается, но иногда нет -- не рискуем.
+                    """
+                    Нужно чистое описание без экранирования. Сравниваем его с описанием, которое достали из xml.
+                    Если равны - то это задание уже было решено.
+                    не сравниваем по id т.к. не знаем точно, как сервер модифицирует id активити.
+                    В большенстве случаев сравнение удается, но иногда нет -- не рискуем.
+                    """
                     solved_descs[j] = solved_descs[j].replace("\\", "")
                     result = solved_results[j]
                     if  result.strip() == "":
                         result = 0
                     solved_results[j] = float(result)
 
-                results = [] #сохраним все рандомные проценты, чтобы потом вычеслить общий процент выполнения
-                #добавим в запрос сначала все уже решенные задания, чтобы не нарушать порядок заданий
+                """
+                Cохраним все рандомные проценты, чтобы потом вычеслить общий процент выполнения.
+                Добавим в запрос сначала все уже решенные задания, чтобы не нарушать порядок заданий.
+                """
+                results = []
                 for j in range(len(solved_ids)):
                     act_id = solved_ids[j]
                     act_result = random.randint(percent_min*10, percent_max*10) / 1000
-                    act_desc = solved_descs[ j ].replace('"', r'\"').replace("'", r"\'")
+                    act_desc = solved_descs[j].replace('"', r'\"').replace("'", r"\'")
                     minutes_spent = random.randint(5, 17)
 
                     if re.search(r'Before_you_begin', act_id):
                         act_result = 1
                         minutes_spent = minutes
 
-                    if solved_results[ j ] > act_result:
+                    if solved_results[j] > act_result:
                         act_result = solved_results[j]
 
-                    time_after_solving = datetime.datetime.now() + datetime.timedelta(minutes = minutes_spent)
+                    time_after_solving = datetime.datetime.now() + datetime.timedelta(minutes=minutes_spent)
                     act_timestamp = urllib.parse.quote_plus(time_after_solving.strftime("%y-%m-%dT%H:%M:%S"))
                     body.update(Breaker._get_interaction_dict(j, act_id, act_result, act_desc , act_timestamp))
                     results.append(act_result)
 
                 #добавляем все остальные задания
                 counter = 0
-                for j in range(0, activities_num):
+                for j in range(activities_num):
                     #с id путаница - проще проверять по описанию
-                    solved_index = _get_similar_string_in_array(tasks[i][ 'activities' ][j]['desc'], solved_descs, .85)
+                    solved_index = _get_similar_string_in_array(tasks[i]['activities'][j]['desc'], solved_descs, .85)
                     if solved_index < 0: #новое задание которое не решали
                         act_id = tasks[i]['activities'][j]['id']
                         act_result = random.randint(percent_min*10, percent_max*10) / 1000
@@ -316,9 +319,9 @@ class Breaker( ):
                             act_result = 1
                             minutes_spent = minutes
 
-                        time_after_solving = datetime.datetime.now() + datetime.timedelta(minutes = minutes_spent)
+                        time_after_solving = datetime.datetime.now() + datetime.timedelta(minutes=minutes_spent)
                         act_timestamp = urllib.parse.quote_plus(time_after_solving.strftime("%y-%m-%dT%H:%M:%S"))
-                        body.update(Breaker._get_interaction_dict(len(solved_ids) + counter, act_id, act_result, act_desc, act_timestamp))
+                        body.update(Breaker._get_interaction_dict(len(solved_ids)+counter, act_id, act_result, act_desc, act_timestamp))
                         results.append(act_result)
                         counter += 1
 
@@ -328,7 +331,7 @@ class Breaker( ):
                     body['cmi__score__scaled'] = score_scaled
                     body['cmi__score__raw'] = score_raw
 
-                    post_url = self.HOST+"/lms/mod/scorm/datamodel.php"
+                    post_url = self.HOST + "/lms/mod/scorm/datamodel.php"
                     post_html = self._browser_post(post_url, body)
                     response = _Response(post_html)
 
@@ -336,11 +339,10 @@ class Breaker( ):
                          raise LMS_UnknownError("Неизвестная ошибка")
 
 
-    def login(self, username, password): #использовать во внешних модулях
+    def login(self, username, password):
         login_url = self.HOST + "/touchstone/p/splash"
         login_html = self._browser_get(login_url)
         response = _Response(login_html)
-        #если уже вошли и имеем много сессий - то получим соответствущий редирект и сообщение
         if response.is_multiple_session():
             raise LMS_SessionError("Сессия уже открыта")
         if response.is_maintance():
@@ -394,10 +396,10 @@ class Breaker( ):
         for unit in units: #формируем список юнитов
             unit_a = unit.find("h3").find("a")
             unit_title = unit_a.get_text()
-            unit_url = unit_a.attrs[ 'href' ]
+            unit_url = unit_a.attrs['href']
             searchObj = re.search(r'id=([0-9]+)', unit_url)
             unit_id = int(searchObj.group(1))
-            unit_list.append({ 'unit_title' : unit_title, 'unit_id' : unit_id })
+            unit_list.append({'unit_title' : unit_title, 'unit_id' : unit_id})
 
         return unit_list
 
