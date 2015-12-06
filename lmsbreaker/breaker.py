@@ -140,6 +140,7 @@ class Breaker():
     def __init__(self):
         self._browser = _Browser()
         self.HOST = "http://www.cambridgelms.org"
+        self.debug = False
 
     def set_cacert_path(self, path):
         self._browser.set_cacert_path(path)
@@ -175,6 +176,9 @@ class Breaker():
             #это время не показывается на сайте, но для надежности установим и его
             'cmi__interactions__'+str(num)+'__timestamp' : timestamp,
         }
+		
+    def enableDebug(self):
+        self.debug = True
 
     def _get_tasks(self, unit_link):
         #ссылка на манифест с id заданий
@@ -335,7 +339,7 @@ class Breaker():
                     post_html = self._browser_post(post_url, body)
                     response = _Response(post_html)
 
-                    if not response.is_post_successful():
+                    if not (response.is_post_successful() or self.debug):
                          raise LMS_UnknownError("Неизвестная ошибка")
 
 
@@ -378,7 +382,7 @@ class Breaker():
         response = _Response(units_html)
         #находим блок со ссылкой на задания
         self_study_block = response.soup.find("div", {"class" : "instituion"})
-        if not self_study_block:
+        if not (self_study_block or self.debug):
             raise LMS_UnknownError("Неизвестная ошибка")
 
         the_tr = self_study_block.find("tr", {"class" : "views-row-last"})
