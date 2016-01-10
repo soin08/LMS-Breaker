@@ -38,11 +38,40 @@ class _Browser(mechanicalsoup.Browser):
     def set_cacert_path(self, path):
         self.cacert_path = path
 
+    def request(self, *args, **kwargs):
+        response = self.session.request(*args, verify = self.cacert_path, **kwargs)
+        _Browser.add_soup(response, self.soup_config)
+        return response
+
     def get(self, *args, **kwargs):
-        return super(_Browser, self).get(*args, verify = self.cacert_path, **kwargs)
+        response = self.session.get(*args, verify = self.cacert_path, **kwargs)
+        _Browser.add_soup(response, self.soup_config)
+        return response
 
     def post(self, *args, **kwargs):
-        return super(_Browser, self).post(*args, verify = self.cacert_path, **kwargs)
+        response = self.session.post(*args, verify = self.cacert_path, **kwargs)
+        _Browser.add_soup(response, self.soup_config)
+        return response
+        #return super(_Browser, self).post(*args, verify = self.cacert_path, **kwargs)
+
+    def submit(self, form, url=None, **kwargs):
+        if isinstance(form, mechanicalsoup.Form):
+            form = form.form
+        request = self._prepare_request(form, url, **kwargs)
+        response = self.session.send(request)
+        _Browser.add_soup(response, self.soup_config)
+        return response
+
+    @staticmethod
+    def add_soup(response, soup_config):
+        """
+        redefining it because parser argument has to be explicity passed to bs4, which
+        is not done in mechanicalsoup. Therefore post, get, submit and request methods have to
+        be overrriden as well.
+        """
+        if "text/html" in response.headers.get("Content-Type", ""):
+            response.soup = BeautifulSoup(
+                response.content, "html.parser", **soup_config)
 
 
 def _get_strings_percent_diff(str1, str2):
@@ -57,10 +86,9 @@ def _get_similar_string_in_array(string, arr, percent):
     return r
 
 class _Response():
-
     def __init__(self, raw_html):
-            self.raw_html = raw_html
-            self.soup = BeautifulSoup(raw_html)
+        self.raw_html = raw_html
+        self.soup = BeautifulSoup(raw_html, "html.parser")
 
     #при неудачной попытке входа получаем ту-же форму, при удачной -- редирект
     def is_logged_in(self):
@@ -135,12 +163,20 @@ class _Response():
     def is_post_successful(self):
          return self.raw_html.find("Success") > 0
 
-class Breaker():
 
-    def __init__(self):
+
+class Breaker():
+    PLATFORM_TYPE_OLD = "old"
+    PLATFORM_TYPE_NEW = "new"
+
+    def __init__(self, platform_type=PLATFORM_TYPE_OLD):
         self._browser = _Browser()
         self.HOST = "http://www.cambridgelms.org"
+        self.platform_type = platform_type
         self.debug = False
+
+    def isOldPlatform(self):
+        return self.platform_type == self.PLATFORM_TYPE_OLD
 
     def set_cacert_path(self, path):
         self._browser.set_cacert_path(path)
@@ -153,6 +189,8 @@ class Breaker():
 
     def _browser_submit(self, form, submit_addr):
         return self._browser.submit(form, submit_addr).text
+
+
 
     @staticmethod
     def _validate_percent(percent_min, percent_max):
@@ -176,7 +214,7 @@ class Breaker():
             #это время не показывается на сайте, но для надежности установим и его
             'cmi__interactions__'+str(num)+'__timestamp' : timestamp,
         }
-		
+
     def enableDebug(self):
         self.debug = True
 
@@ -189,7 +227,7 @@ class Breaker():
         #ссылка на xml с описаниями
         desc_link = self.HOST + unit_link + "menu_info.xml"
         response = self._browser_get(desc_link)
-        desc_soup = BeautifulSoup(response)
+        desc_soup = BeautifulSoup(response, "html.parser")
 
         tasks = []
 
@@ -344,7 +382,7 @@ class Breaker():
 
 
     def login(self, username, password):
-        login_url = self.HOST + "/touchstone/p/splash"
+        login_url = self.HOST + "/touchstone/p/splash" if self.isOldPlatform() else self.HOST + "/main/p/splash"
         login_html = self._browser_get(login_url)
         response = _Response(login_html)
         if response.is_multiple_session():
@@ -374,7 +412,8 @@ class Breaker():
             raise LMS_LoginError("Неверный логин / пароль")
 
     def logout(self):
-        self._browser_get(self.HOST+"/touchstone/p/caslogout")
+        logout_url = "/touchstone/p/caslogout" if self.isOldPlatform() else "/main/p/caslogout"
+        self._browser_get(self.HOST + logout_url)
 
     def get_units(self):
         units_url = self.HOST+"/touchstone/p/frontpage"
