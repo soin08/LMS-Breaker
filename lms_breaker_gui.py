@@ -12,11 +12,10 @@ import os.path
 
 breaker = Breaker()
 
-if os.path.exists("./breaker.exe"): #исполняется exe
+if os.path.exists("./breaker.exe"):
     breaker.set_cacert_path("cacert.pem")
 
 class Cursor:
-
     @staticmethod
     def change_cursor():
          QApplication.setOverrideCursor(QCursor(Qt.WaitCursor))
@@ -27,7 +26,6 @@ class Cursor:
 
 
 class Window:
-
     def show_message(self, header, message):
          QtGui.QMessageBox.about(self,  header, message)
 
@@ -58,7 +56,6 @@ class LoginWindow(QtGui.QWidget, Window):
         username = self.ui.line_username.text()
         password = self.ui.line_password.text()
         return not (len( password.strip(" ")) > 0 and len( username.strip(" "))) > 0
-
 
     def login(self, username, password):
         self.login_thread = LoginThread(username, password)
