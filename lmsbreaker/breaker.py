@@ -163,8 +163,6 @@ class _Response():
     def is_post_successful(self):
          return self.raw_html.find("Success") > 0
 
-
-
 class Breaker():
     PLATFORM_TYPE_OLD = "old"
     PLATFORM_TYPE_NEW = "new"
@@ -190,8 +188,6 @@ class Breaker():
     def _browser_submit(self, form, submit_addr):
         return self._browser.submit(form, submit_addr).text
 
-
-
     @staticmethod
     def _validate_percent(percent_min, percent_max):
         return  (0 <= percent_min <= 100 and 0 <= percent_max <= 100 and percent_min <= percent_max)
@@ -203,6 +199,45 @@ class Breaker():
                 return False
         return True
 
+    def enableDebug(self):
+        self.debug = True
+
+    def login(self, username, password):
+        login_url = self.HOST + "/touchstone/p/splash" if self.isOldPlatform() else self.HOST + "/main/p/splash"
+        login_html = self._browser_get(login_url)
+        response = _Response(login_html)
+        if response.is_multiple_session():
+            raise LMS_SessionError("Сессия уже открыта")
+        if response.is_maintance():
+            raise LMS_MaintanceError("Сайт LMS на ремонте. Попробуйте позднее.")
+        #ссылка на iframe с формой входа
+        login_iframe_src = response.get_login_iframe_src()
+        login_iframe_html = self._browser_get(login_iframe_src)
+        response = _Response(login_iframe_html)
+
+        login_form = response.get_login_form()
+        login_form.find(id="username")['value'] = username
+        login_form.find(id="password")['value'] = password
+        #пытаемся войти
+        submit_html = self._browser_submit(login_form, self.HOST + "/touchstone/p"+login_form.attrs['action'])
+        response = _Response(submit_html)
+        if response.is_logged_in():
+            #получаем js редирект, переходим по нему
+            redirect_url = response.soup.find(id="service")['value']
+            redirect_html = self._browser_get(redirect_url)
+            response = _Response(redirect_html)
+
+            if response.is_multiple_session(): #lms не разрешает более одной сессии
+                raise LMS_SessionError("Сессия уже открыта")
+        else:
+            raise LMS_LoginError("Неверный логин / пароль")
+
+    def logout(self):
+        logout_url = "/touchstone/p/caslogout" if self.isOldPlatform() else "/main/p/caslogout"
+        self._browser_get(self.HOST + logout_url)
+
+
+class OldBreaker(Breaker):
     @staticmethod
     def _get_interaction_dict(num, id, result, description, timestamp):
         return  {
@@ -214,9 +249,6 @@ class Breaker():
             #это время не показывается на сайте, но для надежности установим и его
             'cmi__interactions__'+str(num)+'__timestamp' : timestamp,
         }
-
-    def enableDebug(self):
-        self.debug = True
 
     def _get_tasks(self, unit_link):
         #ссылка на манифест с id заданий
@@ -381,52 +413,18 @@ class Breaker():
                          raise LMS_UnknownError("Неизвестная ошибка")
 
 
-    def login(self, username, password):
-        login_url = self.HOST + "/touchstone/p/splash" if self.isOldPlatform() else self.HOST + "/main/p/splash"
-        login_html = self._browser_get(login_url)
-        response = _Response(login_html)
-        if response.is_multiple_session():
-            raise LMS_SessionError("Сессия уже открыта")
-        if response.is_maintance():
-            raise LMS_MaintanceError("Сайт LMS на ремонте. Попробуйте позднее.")
-        #ссылка на iframe с формой входа
-        login_iframe_src = response.get_login_iframe_src()
-        login_iframe_html = self._browser_get(login_iframe_src)
-        response = _Response(login_iframe_html)
-
-        login_form = response.get_login_form()
-        login_form.find(id="username")['value'] = username
-        login_form.find(id="password")['value'] = password
-        #пытаемся войти
-        submit_html = self._browser_submit(login_form, self.HOST + "/touchstone/p"+login_form.attrs['action'])
-        response = _Response(submit_html)
-        if response.is_logged_in():
-            #получаем js редирект, переходим по нему
-            redirect_url = response.soup.find(id="service")['value']
-            redirect_html = self._browser_get(redirect_url)
-            response = _Response(redirect_html)
-
-            if response.is_multiple_session(): #lms не разрешает более одной сессии
-                raise LMS_SessionError("Сессия уже открыта")
-        else:
-            raise LMS_LoginError("Неверный логин / пароль")
-
-    def logout(self):
-        logout_url = "/touchstone/p/caslogout" if self.isOldPlatform() else "/main/p/caslogout"
-        self._browser_get(self.HOST + logout_url)
-
     def get_units(self):
-        units_url = self.HOST+"/touchstone/p/frontpage"
-        units_html = self._browser_get(units_url)
+        units_url = "/touchstone/p/frontpage" if self.isOldPlatform() else "/main/p/frontpage"
+        units_html = self._browser_get(self.HOST+units_url)
         response = _Response(units_html)
         #находим блок со ссылкой на задания
         self_study_block = response.soup.find("div", {"class" : "instituion"})
         if not (self_study_block or self.debug):
             raise LMS_UnknownError("Неизвестная ошибка")
-
         the_tr = self_study_block.find("tr", {"class" : "views-row-last"})
         #получаем ссылку на workbook
         wb_href = the_tr.find("a").attrs['href']
+
         #ссылка, по которой lms загружает список workbookов
         pkg_url = self.HOST+wb_href+"/packages"
         pkg_html = self._browser_get(pkg_url)
@@ -453,3 +451,34 @@ class Breaker():
             raise LMS_PercentError("Ошибка в значениях процентов")
 
         self._solve(units_chosen, percent_min, percent_max)
+
+
+class NewBreaker(Breaker):
+    def __init__(self):
+        super(Breaker, self).__init__(platform_type=Breaker.PLATFORM_TYPE_NEW)
+
+    def get_content(self):
+        content_url = "/main/p/frontpage"
+        content_html = self._browser_get(self.HOST+content_url)
+        response = _Response(content_html)
+
+        course_url = response.soup.find("a", {"class" : "content-navigation "}).attrs['href']
+        #content includes course, workbook, games, reviews, video activities, tests
+        #parsing avaliable courses
+        course_html = self._browser_get(course_url)
+        response = _Response(course_html)
+        
+        content_list = {}
+        content_list['course'] = []
+
+        units = response.soup.findAll("li", {"class" : "each-unit"})
+
+        for unit in units: #формируем список юнитов
+            unit_a = unit.find("span", {"class": "long-title-text"}).attrs["title"]
+            unit_title = unit_a.get_text()
+            unit_url = unit_a.attrs['href']
+            searchObj = re.search(r'id=([0-9]+)', unit_url)
+            unit_id = int(searchObj.group(1))
+            unit_list.append({'unit_title' : unit_title, 'unit_id' : unit_id})
+
+        return unit_list
